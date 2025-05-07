@@ -21,16 +21,16 @@ from scripts import SignedDistanceField
 from ros import publish_voxel_grid
 
 cell_size = 0.05
-grid_dim = np.array([200, 200, 200], dtype=np.int32)
-box_size = np.array([30, 30, 30], dtype=np.float64)
+grid_dim = np.array([150, 150, 150], dtype=np.int32)
+box_size = np.array([20, 20, 20], dtype=np.float64)
 
 
 # rospy.init_node("voxel_to_rviz")
 
-# vis      = o3d.visualization.Visualizer()
-# vis.create_window(window_name="LCM Box Viewer")
-# box_mesh = None
-# lock     = threading.Lock()
+vis      = o3d.visualization.Visualizer()
+vis.create_window(window_name="LCM Box Viewer")
+box_mesh = None
+lock     = threading.Lock()
 
 
 def voxel_to_occmap(rows, cols, z, cell_size, voxel_grid):
@@ -47,7 +47,7 @@ def create_box_mesh(center, size):
     box.translate(-size/2.0)
     # now move to actual center
     box.translate(center)
-    box.paint_uniform_color([1.0, 0.75, 0.0])
+    box.paint_uniform_color([1.0, 0.75, 0.5])
     return box
 
 
@@ -66,18 +66,21 @@ def pose_handler(channel, data):
     occmap = OccpuancyGrid(*grid_dim, cell_size)
     occmap.add_obstacle(center, box_size)
 
-    # # Visualize the box in Open3D
-    # with lock:
-    #     if box_mesh is None:
-    #         box_mesh = create_box_mesh(center, box_size)
-    #         vis.add_geometry(box_mesh)
-    #     else:
-    #         # compute how far we must move it:
-    #         aabb = box_mesh.get_axis_aligned_bounding_box()
-    #         curr_center = aabb.get_center()
-    #         delta = center - np.asarray(curr_center)
-    #         box_mesh.translate(delta)
-    #         vis.update_geometry(box_mesh)
+    # Visualize the box in Open3D
+    with lock:
+        if box_mesh is None:
+            box_mesh = create_box_mesh(center, box_size)
+            vis.add_geometry(box_mesh)
+        else:
+            # compute how far we must move it:
+            aabb = box_mesh.get_axis_aligned_bounding_box()
+            # curr_center = aabb.get_center()
+            # delta = center - np.asarray(curr_center)
+            box_mesh.transform(T)
+            # box_mesh.translate(delta)
+            box_mesh.paint_uniform_color([0.2, 0.6, 0.9])
+            
+            vis.update_geometry(box_mesh)
 
     origin = np.array([
         occmap.origin_x,
@@ -99,27 +102,27 @@ def pose_handler(channel, data):
 lc = lcm.LCM()
 subscription = lc.subscribe("EXAMPLE", pose_handler)
 
-try:
-    while True:
-        lc.handle()
-except KeyboardInterrupt:
-    pass
-
-
-# def lcm_thread():
-#     while True:
-#         lc.handle()
-
-# # start LCM in background
-# threading.Thread(target=lcm_thread, daemon=True).start()
-
-# # main visualize loop (must run in main thread)
 # try:
 #     while True:
-#         with lock:
-#             vis.poll_events()      # process UI events
-#             vis.update_renderer()  # redraw
-#         time.sleep(0.02)          # ~=50 fps
+#         lc.handle()
 # except KeyboardInterrupt:
 #     pass
+
+
+def lcm_thread():
+    while True:
+        lc.handle()
+
+# start LCM in background
+threading.Thread(target=lcm_thread, daemon=True).start()
+
+# main visualize loop (must run in main thread)
+try:
+    while True:
+        with lock:
+            vis.poll_events()      # process UI events
+            vis.update_renderer()  # redraw
+        time.sleep(0.02)          # ~=50 fps
+except KeyboardInterrupt:
+    pass
 
