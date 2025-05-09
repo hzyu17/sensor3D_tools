@@ -77,8 +77,9 @@ def pcd_handler(channel, data):
     publish_voxel_grid(voxel_grid, topic="/obstacle_voxel", frame="world")
     rospy.spin()
     
+lcm_topic = "EXAMPLE"
 lc = lcm.LCM()
-subscription = lc.subscribe("EXAMPLE", pcd_handler)
+subscription = lc.subscribe(lcm_topic, pcd_handler)
 
 try:
     while True:

@@ -34,9 +34,9 @@ def construct_poselcm_msg(pose):
     return msg
 
 
-def publish_lcm_msg(msg):
+def publish_lcm_msg(msg, topic="EXAMPLE"):
     lc = lcm.LCM()
-    lc.publish("EXAMPLE", msg.encode())
+    lc.publish(topic, msg.encode())
     
 
 if __name__ == '__main__':

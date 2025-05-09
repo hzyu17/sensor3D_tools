@@ -1,24 +1,28 @@
 import torch
 import open3d as o3d
 import numpy as np
+import json
 
-import os
+from pathlib import Path
+import os, sys
 
 this_file = os.path.abspath(__file__)
 this_dir  = os.path.dirname(this_file)
 
+if this_dir not in sys.path:    
+    sys.path.insert(0, this_dir)
+
 
 class OccpuancyGrid:
-    def __init__(self, rows, cols, z, cell_size):
+    def __init__(self, rows, cols, z, cell_size, origin=np.zeros(3)):
         self.rows = rows
         self.cols = cols
         self.z = z
-        self.cell_size = cell_size
         self.map = torch.zeros((rows, cols, z), dtype=torch.uint8)
         self.corner_idx = torch.empty((0, 6), dtype=torch.long)
-        self.origin_x = 0.0
-        self.origin_y = 0.0
-        self.origin_z = 0.0
+        self.origin_x = origin[0]
+        self.origin_y = origin[1]
+        self.origin_z = origin[2]
         self.cell_size = cell_size     
                 
     
@@ -38,8 +42,8 @@ class OccpuancyGrid:
 
         Parameters
         ----------
-        center : (3,) Tensor-like [row, col, depth] – grid-cell centre
-        size     : (3,) Tensor-like [height, width, length] – side lengths (odd)
+        center : (3,) Tensor-like [row, col, height] – grid-cell centre
+        size     : (3,) Tensor-like [width, length, height] – side lengths (odd)
         occ_map  : (H, W, D) torch.Tensor – occupancy grid (modified in place)
         corner   : (N, 6) torch.Tensor – existing list of bounding boxes
 
@@ -48,6 +52,9 @@ class OccpuancyGrid:
         occ_map  : updated occupancy grid (same object, for convenience)
         corner   : updated (N+1, 6) tensor with bounding box [r0, r1, c0, c1, z0, z1]
         """
+        
+        if center.ndim == 2:
+            center = torch.concat((center, torch.tensor([size[2]/2])), dim=0)
         
         # Ensure integer tensors
         pos  = torch.as_tensor(center, dtype=torch.long)
@@ -71,6 +78,23 @@ class OccpuancyGrid:
         
         self.corner_idx   = torch.cat((self.corner_idx, new_box), dim=0)
         
+    def add_obstacle_idx(self, corner_idx):
+        """
+        corner_idx = [xmin xmax  ymin ymax  zmin zmax]  (inclusive voxel indices)
+        """
+        xmin, xmax, ymin, ymax, zmin, zmax = corner_idx
+        # numpy slices are exclusive at the top ➜ +1
+        self.map[ymin:ymax+1, xmin:xmax+1, zmin:zmax+1] = 1
+        
+    @classmethod
+    def from_json(cls, path):
+        spec = json.loads(Path(path).read_text())
+        omap = cls(spec["rows"], spec["cols"], spec["z"],
+                   spec["cell_size"], spec["origin"])
+        for obst in spec.get("obstacles", []):
+            omap.add_obstacle_idx(obst["corner_idx"])
+        return omap
+    
     
     def from_voxel_grid(self, voxel_grid):
         idx_xyz = np.asarray([v.grid_index for v in voxel_grid.get_voxels()], dtype=np.int64)
@@ -80,7 +104,43 @@ class OccpuancyGrid:
         self.set_origin(voxel_grid.origin[0],
                         voxel_grid.origin[1],
                         voxel_grid.origin[2])
-        
+    
+    def to_voxel_grid(self):
+        """
+        Convert this occupancy map (zeros = free, ones = occupied) into an
+        Open3D VoxelGrid object.
+
+        Returns
+        -------
+        o3d.geometry.VoxelGrid
+            Sparse voxel grid whose `voxel_size` equals `self.cell_size`
+            and whose `origin` equals the map's origin.
+        """
+        if not hasattr(self, "cell_size"):
+            raise AttributeError("self must provide `cell_size` (linear voxel size).")
+        if not hasattr(self, "origin_x"):
+            raise AttributeError("self must provide `origin_x / y / z`.")
+
+        # ------------------------------------------------------------------
+        # 1. indices of occupied voxels (Nx, 3) in (x, y, z) order
+        # ------------------------------------------------------------------
+        occ_idx = np.column_stack(np.nonzero(self.map))   # (N,3), each row = [ix, iy, iz]
+
+        if occ_idx.size == 0:
+            raise ValueError("Occupancy map contains no occupied cells.")
+
+        # ------------------------------------------------------------------
+        # 2. build sparse VoxelGrid
+        # ------------------------------------------------------------------
+        vg = o3d.geometry.VoxelGrid()
+        vg.voxel_size = float(self.cell_size)
+        vg.origin     = np.array([self.origin_x, self.origin_y, self.origin_z], dtype=np.float64)
+
+        # create Voxel objects and attach them
+        for ix, iy, iz in occ_idx.T:
+            vg.add_voxel(o3d.geometry.Voxel(np.array([ix, iy, iz], dtype=np.int64)))
+        return vg
+
 
 def save_occmap_for_matlab(occup_map, filename):
     import scipy.io as sio
@@ -239,17 +299,68 @@ def ply_to_mat(filename: str, mat_filename:str, cam2world:np.array, T_CO:np.arra
 
     save_occmap_for_matlab(occup_map, this_dir + '/' + mat_filename)
     
+    
+def transform_sdf(dataset_jsonfile, pose, visualize=True):
+    
+    occup_map = OccpuancyGrid.from_json(dataset_jsonfile)
+    voxel_grid = occup_map.to_voxel_grid()
+    if visualize:
+        o3d.visualization.draw_geometries([voxel_grid])
+    
+    # Convert the voxel grid to a point cloud
+    centers = []
+    colors  = []
+    for v in voxel_grid.get_voxels():                 
+        centre = voxel_grid.get_voxel_center_coordinate(v.grid_index)
+        centers.append(centre)
+        if hasattr(v, "color"):               
+            colors.append(v.color)
+    pc = o3d.geometry.PointCloud()
+    pc.points = o3d.utility.Vector3dVector(np.asarray(centers))
+    
+    # Transform the point cloud using the given pose
+    pc.transform(pose)
+    
+    # Transform back the point cloud to a voxel grid
+    vg_T = o3d.geometry.VoxelGrid.create_from_point_cloud(
+          pc, voxel_size=voxel_grid.voxel_size)
+    
+    if visualize:
+        o3d.visualization.draw_geometries([vg_T])
+    
+    # Convert the voxel grid to an occupancy map
+    occup_map.from_voxel_grid(vg_T)
+    
+    return vg_T, occup_map
+    
+    
 
 if __name__ == '__main__':
+    
     # ==================
     #   Example Usage
-    # ==================
-    # --- Create an occupancy map with one obstacle ----------------------
+    # ==================    
+    # ---- Create an occupancy map with obstacles from json file -----
+    json_file = this_dir+"/WAMDeskDataset.json"
+    
+    T_example = np.eye(4)
+    T_example[:3, 3] = [0.0, 0.0, 0.0]
+    T_example[:3, [0,1]] = T_example[:3, [1,0]]
+    
+    # Transform the sdf according to a given pose
+    transformed_vg, transformed_occup_map = transform_sdf(json_file, T_example)
+    
+    # Convert the occupancy map to a sdf and save it to .bin file
+    save_occmap_for_matlab(transformed_occup_map, this_dir+"/occupancy_map.mat")
+    
+    # read_and_save_sdf(this_dir+"/occupancy_map.mat", sdf_bin_filename)
+    
+    # --- Create an occupancy map with one obstacle -------
     rows, cols, z = 100, 100, 100
     cell_size = 0.05
     occup_map = OccpuancyGrid(rows, cols, z, cell_size)   
 
-    # --- Add a single rectangular obstacle -------------------------------
+    # --- Add a single rectangular obstacle ----------
     center = (50, 50, 50)
     size   = (50, 100, 50)
 

@@ -26,4 +26,4 @@ for i in range(period):
     publish_lcm_msg(msg)
 
     print(f"Sent circular pose #{i}: {[x, y, z]}")
-    time.sleep(0.5)
+    time.sleep(0.1)
