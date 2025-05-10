@@ -96,6 +96,30 @@ class OccpuancyGrid:
         return omap
     
     
+    def save_to_json(self, json_file: str):
+        """
+        Serialize this occupancy grid to JSON with fields
+        { cols, rows, z, origin, cell_size, obstacles:[{ corner_idx: [...] }, …] }.
+        """
+        meta = {
+            "cols":      self.cols,
+            "rows":      self.rows,
+            "z":         self.z,
+            "origin":    [self.origin_x, self.origin_y, self.origin_z],
+            "cell_size": self.cell_size,
+            # build a list of dicts for each obstacle
+            "obstacles": [
+                {"corner_idx": box.tolist()}
+                for box in self.corner_idx
+            ],
+        }
+
+        path = Path(json_file)
+        path.write_text(json.dumps(meta, indent=2))
+        
+        print(f"Wrote {path}  ({len(meta['obstacles'])} obstacles)")
+    
+    
     def from_voxel_grid(self, voxel_grid):
         idx_xyz = np.asarray([v.grid_index for v in voxel_grid.get_voxels()], dtype=np.int64)
         
@@ -301,6 +325,18 @@ def ply_to_mat(filename: str, mat_filename:str, cam2world:np.array, T_CO:np.arra
     
     
 def transform_sdf(dataset_jsonfile, pose, visualize=True):
+    """Transform a Signed Distance Function (SDF) according to a given pose, 
+        and convert it to an voxel grid (occupancy map) as the return value.
+
+    Args:
+        dataset_jsonfile (str): json configuration file
+        pose (np.array(4,4)): SE(3) pose to transform the sdf
+        visualize (bool, optional): Defaults to True.
+
+    Returns:
+        vg_T: transformed voxel grid
+        occup_map: transformed occupancy map
+    """
     
     occup_map = OccpuancyGrid.from_json(dataset_jsonfile)
     voxel_grid = occup_map.to_voxel_grid()
