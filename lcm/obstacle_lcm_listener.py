@@ -88,11 +88,6 @@ def pose_handler(channel, data):
     occmap = OccpuancyGrid(*grid_dim, cell_size)
     occmap.from_voxel_grid(voxel_grid)
     
-    origin = np.array([
-        occmap.origin_x,
-        occmap.origin_y,
-        occmap.origin_z
-    ], dtype=np.float64)
     
     # Visualize the voxel grid
     with lock:
@@ -104,6 +99,11 @@ def pose_handler(channel, data):
             vox = voxel_grid      
             vis.add_geometry(vox)
     
+    # origin = np.array([
+    #     occmap.origin_x,
+    #     occmap.origin_y,
+    #     occmap.origin_z
+    # ], dtype=np.float64)
     
     # field3D = SignedDistanceField3D.generate_field3D(occmap.map.detach().numpy(), cell_size=cell_size)
     # sdf = SignedDistanceField(origin, occmap.cell_size,
