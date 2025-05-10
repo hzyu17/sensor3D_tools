@@ -45,6 +45,9 @@ class OccpuancyGrid:
         corner   : updated (N+1, 6) tensor with bounding box [r0, r1, c0, c1, z0, z1]
         """
         
+        # Convert matlab to python
+        center = center - 1
+        
         if center.ndim == 2:
             center = torch.concat((center, torch.tensor([size[2]/2])), dim=0)
         
@@ -79,6 +82,15 @@ class OccpuancyGrid:
         # numpy slices are exclusive at the top ➜ +1
         self.map[ymin:ymax+1, xmin:xmax+1, zmin:zmax+1] = 1
         
+    
+    def corner_to_size(self, corner_idx):
+        """
+        corner_idx = [xmin xmax  ymin ymax  zmin zmax]  (inclusive voxel indices)
+        """
+        xmin, xmax, ymin, ymax, zmin, zmax = corner_idx.detach().numpy().tolist()
+        # numpy slices are exclusive at the top ➜ +1
+        return [xmax - xmin, ymax - ymin, zmax-zmin]
+        
         
     @classmethod
     def from_json(cls, path):
@@ -103,11 +115,19 @@ class OccpuancyGrid:
             "cell_size": self.cell_size,
             # build a list of dicts for each obstacle
             "obstacles": [
-                {"corner_idx": box.tolist()}
+                {"corner_idx": box.tolist(),
+                 "size": self.corner_to_size(box)}
                 for box in self.corner_idx
             ],
         }
 
+        print("obstacles")
+        print([
+                {"corner_idx": box.tolist(),
+                 "size": self.corner_to_size(box)}
+                for box in self.corner_idx
+            ])
+        
         path = Path(json_file)
         path.write_text(json.dumps(meta, indent=2))
         
@@ -162,8 +182,9 @@ class OccpuancyGrid:
     
     
     def visualize(self):
+        base_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3) 
         vg = self.to_voxel_grid()
-        o3d.visualization.draw_geometries([vg],
+        o3d.visualization.draw_geometries([vg, base_frame],
                                            window_name="Occupancy Map",
                                            width=800,
                                            height=600,

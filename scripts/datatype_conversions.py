@@ -223,7 +223,7 @@ if __name__ == '__main__':
     print("min corner:", min_corner)
     print("max corner:", max_corner)
     print("voxels:", voxels)
-
+    
     # -------------------------------
     #  From voxels to occupancy grid
     # -------------------------------

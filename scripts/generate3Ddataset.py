@@ -1,16 +1,7 @@
 import numpy as np
-import os, sys
-
-this_file = os.path.abspath(__file__)
-this_dir  = os.path.dirname(this_file)
-
-if this_dir not in sys.path:    
-    sys.path.insert(0, this_dir)
-
-
 from OccupancyGrid import OccpuancyGrid  # adjust import to where you defined it
 import SignedDistanceField3D
-from bind_SDF import SignedDistanceField
+from vimp.pybinds.bind_SDF import SignedDistanceField
 
 
 def generate_3d_dataset(dataset_str: str) -> OccpuancyGrid:
@@ -201,7 +192,7 @@ if __name__ == '__main__':
     sdf = SignedDistanceField(origin, grid.cell_size,
                               field3d.shape[0], field3d.shape[1], field3d.shape[2])
     for z in range(field3d.shape[2]):
-        sdf.initFieldData(z, field3d[:,:,z])
+        sdf.initFieldData(z, field3d[:,:,z].transpose())
 
     sdf.saveSDF(str(Path(__file__).parent / "FrankaBoxDataset_cereal.bin"))
     
