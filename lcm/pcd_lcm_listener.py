@@ -4,21 +4,7 @@ import open3d as o3d
 import numpy as np
 import rospy
 
-import os, sys
-this_file = os.path.abspath(__file__)
-this_dir  = os.path.dirname(this_file)
-root_dir = os.path.dirname(this_dir)
-scripts_dir = root_dir + "/scripts"
-ros_dir = root_dir + "/ros"
-
-if root_dir not in sys.path:            
-    sys.path.insert(0, root_dir)
-
-
-from scripts import OccpuancyGrid, SignedDistanceField3D
-# import scripts.SignedDistanceField3D
-from scripts import SignedDistanceField
-from ros import publish_voxel_grid
+from vimp.thirdparty.sensor3D_tools import OccpuancyGrid, SignedDistanceField3D, SignedDistanceField, publish_voxel_grid
 
 # optional RGB in range [0, 1]
 rgb = np.asarray([
@@ -35,11 +21,11 @@ def voxel_to_occmap(rows, cols, z, cell_size, voxel_grid):
     return occmap
 
 
-rospy.init_node("voxel_to_rviz")
-
 def pcd_handler(channel, data):
+    rospy.init_node("voxel_to_rviz")
     msg = pcd_t.decode(data)
     print("Received pcd message on channel \"%s\"" % channel)
+    print("   frame name  = %s" % str(msg.frame_name))
     print("   timestamp   = %s" % str(msg.timestamp))
     print("   pose    = %s" % str(msg.pose))
     print("   num_points = %s" % str(msg.num_points))
@@ -77,12 +63,13 @@ def pcd_handler(channel, data):
     publish_voxel_grid(voxel_grid, topic="/obstacle_voxel", frame="world")
     rospy.spin()
     
-lcm_topic = "EXAMPLE"
-lc = lcm.LCM()
-subscription = lc.subscribe(lcm_topic, pcd_handler)
+if __name__ == '__main__':
+    lcm_topic = "EXAMPLE"
+    lc = lcm.LCM()
+    subscription = lc.subscribe(lcm_topic, pcd_handler)
 
-try:
-    while True:
-        lc.handle()
-except KeyboardInterrupt:
-    pass
+    try:
+        while True:
+            lc.handle()
+    except KeyboardInterrupt:
+        pass

@@ -9,13 +9,15 @@ import struct
 
 class pose_t(object):
 
-    __slots__ = ["timestamp", "pose"]
+    __slots__ = ["frame_name", "timestamp", "pose"]
 
-    __typenames__ = ["int64_t", "double"]
+    __typenames__ = ["string", "int64_t", "double"]
 
-    __dimensions__ = [None, [4, 4]]
+    __dimensions__ = [None, None, [4, 4]]
 
     def __init__(self):
+        self.frame_name = ""
+        """ LCM Type: string """
         self.timestamp = 0
         """ LCM Type: int64_t """
         self.pose = [ [ 0.0 for dim1 in range(4) ] for dim0 in range(4) ]
@@ -28,6 +30,10 @@ class pose_t(object):
         return buf.getvalue()
 
     def _encode_one(self, buf):
+        __frame_name_encoded = self.frame_name.encode('utf-8')
+        buf.write(struct.pack('>I', len(__frame_name_encoded)+1))
+        buf.write(__frame_name_encoded)
+        buf.write(b"\0")
         buf.write(struct.pack(">q", self.timestamp))
         for i0 in range(4):
             buf.write(struct.pack('>4d', *self.pose[i0][:4]))
@@ -45,6 +51,8 @@ class pose_t(object):
     @staticmethod
     def _decode_one(buf):
         self = pose_t()
+        __frame_name_len = struct.unpack('>I', buf.read(4))[0]
+        self.frame_name = buf.read(__frame_name_len)[:-1].decode('utf-8', 'replace')
         self.timestamp = struct.unpack(">q", buf.read(8))[0]
         self.pose = []
         for i0 in range(4):
@@ -54,7 +62,7 @@ class pose_t(object):
     @staticmethod
     def _get_hash_recursive(parents):
         if pose_t in parents: return 0
-        tmphash = (0x1a9289bde6dc897b) & 0xffffffffffffffff
+        tmphash = (0xbdd54a7e751f83a) & 0xffffffffffffffff
         tmphash  = (((tmphash<<1)&0xffffffffffffffff) + (tmphash>>63)) & 0xffffffffffffffff
         return tmphash
     _packed_fingerprint = None

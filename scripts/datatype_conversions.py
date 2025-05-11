@@ -101,33 +101,7 @@ def transform_sdf(dataset_jsonfile, pose, visualize=True):
     """
     
     occup_map = OccpuancyGrid.from_json(dataset_jsonfile)
-    voxel_grid = occup_map.to_voxel_grid()
-    if visualize:
-        o3d.visualization.draw_geometries([voxel_grid])
-    
-    # Convert the voxel grid to a point cloud
-    centers = []
-    colors  = []
-    for v in voxel_grid.get_voxels():                 
-        centre = voxel_grid.get_voxel_center_coordinate(v.grid_index)
-        centers.append(centre)
-        if hasattr(v, "color"):               
-            colors.append(v.color)
-    pc = o3d.geometry.PointCloud()
-    pc.points = o3d.utility.Vector3dVector(np.asarray(centers))
-    
-    # Transform the point cloud using the given pose
-    pc.transform(pose)
-    
-    # Transform back the point cloud to a voxel grid
-    vg_T = o3d.geometry.VoxelGrid.create_from_point_cloud(
-          pc, voxel_size=voxel_grid.voxel_size)
-    
-    if visualize:
-        o3d.visualization.draw_geometries([vg_T])
-    
-    # Convert the voxel grid to an occupancy map
-    occup_map.from_voxel_grid(vg_T)
+    vg_T = occup_map.transform(pose, visualize)
     
     return vg_T, occup_map
     
@@ -138,7 +112,7 @@ if __name__ == '__main__':
     # ==================
     #   Example Usage
     # ==================    
-    # ---- Create an occupancy map with obstacles from json file -----
+    # ---- Create an occupancy map with obstacles from json file, and transform using a pose -----
     json_file = this_dir+"/WAMDeskDataset.json"
     
     T_example = np.eye(4)

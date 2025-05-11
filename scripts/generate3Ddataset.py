@@ -75,7 +75,7 @@ def generate_3d_dataset(dataset_str: str) -> OccpuancyGrid:
             ([250, 140, 140], [ 60, 100,   5]),
             ([250, 140,  90], [ 60, 100,   5]),
         ]
-        
+    
     elif dataset_str == 'FrankaBoxDataset':
         rows, cols, z = 300, 300, 300
         origin = np.array([-1.5, -1.5,  0.0])

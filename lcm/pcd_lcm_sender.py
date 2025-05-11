@@ -5,9 +5,6 @@ import os, sys
 
 this_file = os.path.abspath(__file__)
 this_dir  = os.path.dirname(this_file)
-
-print("this_dir:", this_dir)
-
 if this_dir not in sys.path:            
     sys.path.insert(0, this_dir)
     
@@ -26,8 +23,9 @@ def construct_pcdlcm_msg(pose, num_points, points, robot_base_offset):
     return msg
 
 
-def construct_poselcm_msg(pose):
+def construct_poselcm_msg(pose, name='bodyframe'):
     msg = pose_t()
+    msg.frame_name = name
     msg.timestamp = int(time.time())
     msg.pose = pose
     

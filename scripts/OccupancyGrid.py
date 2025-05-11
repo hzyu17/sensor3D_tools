@@ -73,7 +73,7 @@ class OccpuancyGrid:
         
         self.corner_idx   = torch.cat((self.corner_idx, new_box), dim=0)
         
-        
+    
     def add_obstacle_idx(self, corner_idx):
         """
         corner_idx = [xmin xmax  ymin ymax  zmin zmax]  (inclusive voxel indices)
@@ -134,7 +134,41 @@ class OccpuancyGrid:
         print(f"Wrote {path}  ({len(meta['obstacles'])} obstacles)")
     
     
+    def transform(self, pose, visualize=True):
+        # Transform the occupancy map according to a given pose
+        voxel_grid = self.to_voxel_grid()
+        if visualize:
+            self.visualize()
+        
+        # Convert the voxel grid to a point cloud
+        centers = []
+        colors  = []
+        for v in voxel_grid.get_voxels():                 
+            centre = voxel_grid.get_voxel_center_coordinate(v.grid_index)
+            centers.append(centre)
+            if hasattr(v, "color"):               
+                colors.append(v.color)
+        pc = o3d.geometry.PointCloud()
+        pc.points = o3d.utility.Vector3dVector(np.asarray(centers))
+        
+        # Transform the point cloud using the given pose
+        pc.transform(pose)
+        
+        # Transform back the point cloud to a voxel grid
+        vg_T = o3d.geometry.VoxelGrid.create_from_point_cloud(
+            pc, voxel_size=voxel_grid.voxel_size)
+        
+        # Convert the voxel grid to an occupancy map
+        self.from_voxel_grid(vg_T)
+        
+        if visualize:
+            self.visualize()
+        
+        return vg_T
+        
+    
     def from_voxel_grid(self, voxel_grid):
+        # Update the occupancies from a given voxel grid in open3d
         idx_xyz = np.asarray([v.grid_index for v in voxel_grid.get_voxels()], dtype=np.int64)
         
         self.map[idx_xyz[:, 0], idx_xyz[:, 1], idx_xyz[:, 2]] = 1
@@ -168,9 +202,9 @@ class OccpuancyGrid:
         if occ_idx.size == 0:
             raise ValueError("Occupancy map contains no occupied cells.")
 
-        # ------------------------------------------------------------------
+        # -----------------------------
         # 2. build sparse VoxelGrid
-        # ------------------------------------------------------------------
+        # -----------------------------
         vg = o3d.geometry.VoxelGrid()
         vg.voxel_size = float(self.cell_size)
         vg.origin     = np.array([self.origin_x, self.origin_y, self.origin_z], dtype=np.float64)
@@ -179,6 +213,17 @@ class OccpuancyGrid:
         for ix, iy, iz in occ_idx.T:
             vg.add_voxel(o3d.geometry.Voxel(np.array([ix, iy, iz], dtype=np.int64)))
         return vg
+    
+    
+    def origin(self):
+        return np.array([self.origin_x, self.origin_y, self.origin_z])
+        
+    
+    def clear(self):
+        """
+        Clear all occupancy grids.
+        """
+        self.map.fill(0)
     
     
     def visualize(self):

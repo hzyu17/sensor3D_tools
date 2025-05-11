@@ -1,1 +1,2 @@
 from .ros_data_conversions import publish_voxel_grid, o3d_voxelgrid_to_ros, rosvoxel_to_octomap
+from .voxel_to_rviz import publish_voxel_grid

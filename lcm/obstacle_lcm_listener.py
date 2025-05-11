@@ -2,23 +2,11 @@ import lcm
 from exlcm import pose_t
 import open3d as o3d
 import numpy as np
-import rospy
 
-import os, sys, time, threading
+import time, threading
 
-this_file = os.path.abspath(__file__)
-this_dir  = os.path.dirname(this_file)
-root_dir = os.path.dirname(this_dir)
-scripts_dir = root_dir + "/scripts"
-ros_dir = root_dir + "/ros"
+from vimp.thirdparty.sensor3D_tools import OccpuancyGrid, SignedDistanceField3D, SignedDistanceField, publish_voxel_grid
 
-if root_dir not in sys.path:            
-    sys.path.insert(0, root_dir)
-
-
-from scripts import OccpuancyGrid, SignedDistanceField3D
-from scripts import SignedDistanceField
-from ros import publish_voxel_grid
 
 cell_size = 0.1
 grid_dim = np.array([500, 500, 500], dtype=np.int32)
@@ -27,8 +15,6 @@ offset_center = np.array([0, 0, 0], dtype=np.float64)
 
 # rospy.init_node("voxel_to_rviz")
 
-vis = o3d.visualization.Visualizer()
-vis.create_window(window_name="LCM Box Viewer")
 box_mesh = None
 lock = threading.Lock()
 vox = None
@@ -57,10 +43,10 @@ def create_box_mesh(center, size):
     return box
 
 
-def pose_handler(channel, data):
+def pose_handler(channel, data, vis):
     global box_mesh
     global vox 
-    global vis
+    
     msg = pose_t.decode(data)
     msg_T = np.asarray(msg.pose, dtype=np.float64).reshape(4, 4)
     
@@ -113,25 +99,30 @@ def pose_handler(channel, data):
 
     # print("SDF Constructed!")
 
-    
-lc = lcm.LCM()
-subscription = lc.subscribe("EXAMPLE", pose_handler)
-
 
 def lcm_thread():
     while True:
         lc.handle()
 
-# start LCM in background
-threading.Thread(target=lcm_thread, daemon=True).start()
 
-# main visualize loop (must run in main thread)
-try:
-    while True:
-        with lock:
-            vis.poll_events()      # process UI events
-            vis.update_renderer()  # redraw
-        time.sleep(0.02)          # ~=50 fps
-except KeyboardInterrupt:
-    pass
+if __name__ == '__main__':
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(window_name="LCM Box Viewer")
+    
+    lc = lcm.LCM()
+    subscription = lc.subscribe("EXAMPLE", 
+                                lambda channel, data: pose_handler(channel, data, vis))
+
+    # start LCM in background
+    threading.Thread(target=lcm_thread, daemon=True).start()
+
+    # main visualize loop (must run in main thread)
+    try:
+        while True:
+            with lock:
+                vis.poll_events()      # process UI events
+                vis.update_renderer()  # redraw
+            time.sleep(0.02)          # ~=50 fps
+    except KeyboardInterrupt:
+        pass
 
