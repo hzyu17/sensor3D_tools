@@ -90,8 +90,8 @@ def generate_3d_dataset(dataset_str: str) -> OccpuancyGrid:
         origin = np.array([-1.5, -1.5, 0.0])
         cell_size = 0.01
         obs = [
-            ([200, 150, 20], [20, 20, 40]),
-            ([200, 150, 42], [60, 60,  4]),
+            ([200, 155, 20], [20, 20, 40]),
+            ([200, 155, 42], [60, 60,  4]),
         ]
         
     elif dataset_str == 'PR2DeskDataset':
