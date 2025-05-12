@@ -36,8 +36,6 @@ class OccpuancyGrid:
         ----------
         center : (3,) Tensor-like [row, col, height] – grid-cell centre
         size     : (3,) Tensor-like [width, length, height] – side lengths (odd)
-        occ_map  : (H, W, D) torch.Tensor – occupancy grid (modified in place)
-        corner   : (N, 6) torch.Tensor – existing list of bounding boxes
 
         Returns
         -------
@@ -137,8 +135,6 @@ class OccpuancyGrid:
     def transform(self, pose, visualize=True):
         # Transform the occupancy map according to a given pose
         voxel_grid = self.to_voxel_grid()
-        if visualize:
-            self.visualize()
         
         # Convert the voxel grid to a point cloud
         centers = []
@@ -171,6 +167,8 @@ class OccpuancyGrid:
         # Update the occupancies from a given voxel grid in open3d
         idx_xyz = np.asarray([v.grid_index for v in voxel_grid.get_voxels()], dtype=np.int64)
         
+        self.clear()
+        
         self.map[idx_xyz[:, 0], idx_xyz[:, 1], idx_xyz[:, 2]] = 1
         
         self.set_origin(voxel_grid.origin[0],
@@ -197,8 +195,12 @@ class OccpuancyGrid:
         # ------------------------------------------------------------------
         # 1. indices of occupied voxels (Nx, 3) in (x, y, z) order
         # ------------------------------------------------------------------
-        occ_idx = np.column_stack(np.nonzero(self.map))   # (N,3), each row = [ix, iy, iz]
-
+        print("np.nonzero(self.map): ", np.nonzero(self.map))
+        if len(np.nonzero(self.map)) == 0:
+            raise RuntimeError("Map is empty!!")
+        else:
+            occ_idx = np.column_stack(np.nonzero(self.map))   # (N,3), each row = [ix, iy, iz]
+            
         if occ_idx.size == 0:
             raise ValueError("Occupancy map contains no occupied cells.")
 
@@ -223,17 +225,22 @@ class OccpuancyGrid:
         """
         Clear all occupancy grids.
         """
-        self.map.fill(0)
+        self.map.zero_()
     
     
     def visualize(self):
         base_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3) 
         vg = self.to_voxel_grid()
-        o3d.visualization.draw_geometries([vg, base_frame],
-                                           window_name="Occupancy Map",
-                                           width=800,
-                                           height=600,
-                                           point_show_normal=False)
+        
+        vis = o3d.visualization.Visualizer()
+        
+        vis.create_window(window_name="Occupancy Map",
+                        width=800, height=600)
+        vis.add_geometry(vg)
+        vis.add_geometry(base_frame)
+
+        vis.run()
+        vis.destroy_window()
     
     
 if __name__ == '__main__':
