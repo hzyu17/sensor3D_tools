@@ -12,6 +12,7 @@ struct pcd_t
 
 struct pose_t
 {
+    string   frame_name;
     int64_t  timestamp;
     double   pose[4][4];
 }
