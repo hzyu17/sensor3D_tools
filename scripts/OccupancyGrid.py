@@ -131,36 +131,41 @@ class OccpuancyGrid:
         
         print(f"Wrote {path}  ({len(meta['obstacles'])} obstacles)")
     
-    
+
     def transform(self, pose, visualize=True):
-        # Transform the occupancy map according to a given pose
-        voxel_grid = self.to_voxel_grid()
-        
-        # Convert the voxel grid to a point cloud
-        centers = []
-        colors  = []
-        for v in voxel_grid.get_voxels():                 
-            centre = voxel_grid.get_voxel_center_coordinate(v.grid_index)
-            centers.append(centre)
-            if hasattr(v, "color"):               
-                colors.append(v.color)
-        pc = o3d.geometry.PointCloud()
-        pc.points = o3d.utility.Vector3dVector(np.asarray(centers))
-        
-        # Transform the point cloud using the given pose
-        pc.transform(pose)
-        
-        # Transform back the point cloud to a voxel grid
-        vg_T = o3d.geometry.VoxelGrid.create_from_point_cloud(
-            pc, voxel_size=voxel_grid.voxel_size)
-        
-        # Convert the voxel grid to an occupancy map
-        self.from_voxel_grid(vg_T)
-        
+        """
+        Transform the occupancy grid by a given pose.
+        """
+        # 1) get all occupied voxel‑indices (N×3)
+        idx = np.array(np.nonzero(self.map))  # shape (N,3)
+
+        # 2) world‑coords, homogeneous
+        pts = idx * self.cell_size + np.array([self.origin_x,
+                                            self.origin_y,
+                                            self.origin_z])
+        pts_h = np.hstack([pts, np.ones((pts.shape[0],1))])  # (N,4)
+
+        # 3) apply pose
+        pts_t = (pose @ pts_h.T).T[:, :3]  # still shape (N,3)
+
+        # 4) back into grid‑indices
+        new_idx = np.round((pts_t - [self.origin_x,
+                                    self.origin_y,
+                                    self.origin_z])
+                        / self.cell_size).astype(int)
+
+        # 5) write into a fresh map
+        new_map = torch.zeros_like(self.map)
+        mask = np.all((new_idx >= 0) & 
+                    (new_idx < np.array(self.map.shape)), axis=1)
+        valid = new_idx[mask]
+        new_map[valid[:,0], valid[:,1], valid[:,2]] = 1
+        self.map = new_map
+
         if visualize:
             self.visualize()
-        
-        return vg_T
+        return
+
         
     
     def from_voxel_grid(self, voxel_grid):
@@ -195,6 +200,7 @@ class OccpuancyGrid:
         # ------------------------------------------------------------------
         # 1. indices of occupied voxels (Nx, 3) in (x, y, z) order
         # ------------------------------------------------------------------
+        print("Transforming occupancy map to voxel grid...")
         print("np.nonzero(self.map): ", np.nonzero(self.map))
         if len(np.nonzero(self.map)) == 0:
             raise RuntimeError("Map is empty!!")
@@ -231,6 +237,33 @@ class OccpuancyGrid:
     def visualize(self):
         base_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3) 
         vg = self.to_voxel_grid()
+
+        print("Voxel origin: ", vg.origin)
+
+        # # Visualize the occupancy grid with respect to the origin
+        # import copy
+        # vg_origin = copy.deepcopy(vg)
+        # pose_origin = np.eye(4)
+        # pose_origin[:3, 3] = np.array([self.origin_x, self.origin_y, self.origin_z])
+        
+        # # Convert the voxel grid to a point cloud
+        # centers = []
+        # colors  = []
+        # for v in vg_origin.get_voxels():                 
+        #     centre = vg_origin.get_voxel_center_coordinate(v.grid_index)
+        #     centers.append(centre)
+        #     if hasattr(v, "color"):               
+        #         colors.append(v.color)
+        # pc = o3d.geometry.PointCloud()
+        # pc.points = o3d.utility.Vector3dVector(np.asarray(centers))
+        
+        # # Transform the point cloud using the given pose
+        # pc.transform(pose_origin)
+        
+        # # Transform back the point cloud to a voxel grid
+        # vg_origin = o3d.geometry.VoxelGrid.create_from_point_cloud(
+        #     pc, voxel_size=vg_origin.voxel_size)
+        
         
         vis = o3d.visualization.Visualizer()
         
