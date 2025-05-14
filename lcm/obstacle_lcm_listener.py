@@ -95,7 +95,7 @@ def pose_handler(channel, data, vis):
     # sdf = SignedDistanceField(origin, occmap.cell_size,
     #                           field3D.shape[0], field3D.shape[1], field3D.shape[2])
     # for z in range(field3D.shape[2]):
-    #     sdf.initFieldData(z, field3D[:,:,z])
+    #     sdf.initFieldData(z, field3D[:,:,z].T)
 
     # print("SDF Constructed!")
 

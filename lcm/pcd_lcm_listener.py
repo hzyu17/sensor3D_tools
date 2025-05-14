@@ -51,7 +51,7 @@ def pcd_handler(channel, data):
                               field3D.shape[0], field3D.shape[1], field3D.shape[2])
     
     for z in range(field3D.shape[2]):
-        sdf.initFieldData(z, field3D[:,:,z])
+        sdf.initFieldData(z, field3D[:,:,z].T)
     
     # An example signed distance 
     test_pt = np.array([0.5, 0.5, 0.5])
