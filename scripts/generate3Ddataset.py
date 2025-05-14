@@ -1,7 +1,7 @@
 import numpy as np
 from OccupancyGrid import OccpuancyGrid  # adjust import to where you defined it
 import SignedDistanceField3D
-from vimp.pybinds.bind_SDF import SignedDistanceField
+from vimp.thirdparty.sensor3D_tools import SignedDistanceField
 
 
 def generate_3d_dataset(dataset_str: str) -> OccpuancyGrid:
@@ -93,6 +93,14 @@ def generate_3d_dataset(dataset_str: str) -> OccpuancyGrid:
             ([200, 155, 20], [20, 20, 40]),
             ([200, 155, 42], [60, 60,  4]),
         ]
+
+    elif dataset_str == 'FrankaBoxDatasetHardware':
+        rows, cols, z = 500, 500, 500
+        origin = np.array([-2.5, -2.5, 0.0])
+        cell_size = 0.01
+        obs = [
+            ([285, 260, 26], [18, 18, 50]),
+        ]
         
     elif dataset_str == 'PR2DeskDataset':
         rows, cols, z = 300, 300, 300
@@ -176,9 +184,9 @@ if __name__ == '__main__':
     
     from pathlib import Path
     
-    grid = generate_3d_dataset('FrankaBoxDataset')
+    grid = generate_3d_dataset('FrankaBoxDatasetHardware')
     grid.visualize()
-    grid.save_to_json(Path(__file__).parent / "FrankaBoxDataset.json")
+    grid.save_to_json(Path(__file__).parent / "FrankaBoxDatasetHardware.json")
     
     # Convert the occupancy map to a signed distance field and save its    
     field3d = SignedDistanceField3D.generate_field3D(grid.map.detach().numpy(), grid.cell_size)
@@ -194,5 +202,5 @@ if __name__ == '__main__':
     for z in range(field3d.shape[2]):
         sdf.initFieldData(z, field3d[:,:,z].transpose())
 
-    sdf.saveSDF(str(Path(__file__).parent / "FrankaBoxDataset_cereal.bin"))
+    sdf.saveSDF(str(Path(__file__).parent / "FrankaBoxDatasetHardware_cereal.bin"))
     
