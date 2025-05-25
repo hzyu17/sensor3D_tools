@@ -78,6 +78,10 @@ PYBIND11_MODULE(bind_SDF, m) {
                py::arg("point"),
                "Query the interpolated signed distance at a 2D point")
 
+          .def("getSignedDistanceBatched", &PlanarSDF::getSignedDistanceBatched,
+               py::arg("point_mat"),
+               "Query the interpolated signed distance at a batch of 2D points")
+
           .def("getGradient", &PlanarSDF::getGradient,
                py::arg("point"),
                "Query the gradient at a 2D point")

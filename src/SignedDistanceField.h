@@ -57,7 +57,7 @@ public:
       Eigen::Vector3d p = points.row(i);
       // reuse your single‐point logic
       const float_index pidx = convertPoint3toCell(p);
-      dists[i] = signed_distance(pidx);
+      dists(i) = signed_distance(pidx);
     }
     return dists;
   }
